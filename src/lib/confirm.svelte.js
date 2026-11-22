@@ -25,17 +25,35 @@ export function getConfirmState() {
  * false on cancel/backdrop/Escape.
  *
  * @param {object} [options] - ConfirmDialog props: message, title,
- *   confirmLabel, cancelLabel, variant ('danger' default).
+ *   confirmLabel (or confirmText), cancelLabel (or cancelText),
+ *   variant (or type, 'danger' default).
  * @returns {Promise<boolean>}
  */
 export function askConfirm(options = {}) {
+  if (state.open && state.resolve) {
+    const previousResolve = state.resolve
+    state.resolve = null
+    previousResolve(false)
+  }
+
   return new Promise((resolve) => {
+    const {
+      confirmLabel,
+      confirmText,
+      cancelLabel,
+      cancelText,
+      variant,
+      type,
+      ...rest
+    } = options
+
     state.options = {
       title: 'تأیید عملیات',
       message: 'آیا از انجام این عمل اطمینان دارید؟',
-      confirmLabel: 'تأیید',
-      variant: 'danger',
-      ...options,
+      ...rest,
+      confirmLabel: confirmLabel ?? confirmText ?? 'تأیید',
+      cancelLabel: cancelLabel ?? cancelText ?? 'انصراف',
+      variant: variant ?? type ?? 'danger',
     }
     state.resolve = resolve
     state.open = true
@@ -45,6 +63,7 @@ export function askConfirm(options = {}) {
 /** Resolve the pending promise and close the dialog. */
 export function settleConfirm(answer) {
   state.open = false
-  state.resolve?.(answer)
+  const pendingResolve = state.resolve
   state.resolve = null
+  pendingResolve?.(answer)
 }

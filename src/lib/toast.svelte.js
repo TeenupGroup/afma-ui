@@ -11,9 +11,6 @@
  *   toast.error('خطا در برقراری ارتباط با سرور')
  *   toast.warning('توجه: این عمل غیرقابل بازگشت است')
  *   toast.info('اطلاعات بروزرسانی شدند')
- *
- *   // Backward compatibility alias:
- *   flashToast('پیام مورد نظر', 'success')
  */
 
 let toasts = $state([])
@@ -27,10 +24,36 @@ export function getToastsState() {
   return toasts
 }
 
-export function dismissToast(id) {
+function clearTimerFor(id) {
   if (timers.has(id)) {
     clearTimeout(timers.get(id))
     timers.delete(id)
+  }
+}
+
+function settlePendingConfirm(item) {
+  if (!item || item.settled) return
+  item.settled = true
+  if (typeof item.onConfirm === 'function') {
+    const cb = item.onConfirm
+    item.onConfirm = undefined
+    try {
+      cb()
+    } catch (err) {
+      console.error('Confirm action failed:', err)
+    }
+  }
+}
+
+export function dismissToast(id, { runConfirm = false } = {}) {
+  clearTimerFor(id)
+  const target = toasts.find((t) => t.id === id)
+  if (target) {
+    if (runConfirm) {
+      settlePendingConfirm(target)
+    } else {
+      target.settled = true
+    }
   }
   toasts = toasts.filter((t) => t.id !== id)
 }
@@ -38,37 +61,44 @@ export function dismissToast(id) {
 export function clearToasts() {
   timers.forEach((timer) => clearTimeout(timer))
   timers.clear()
+  for (const item of toasts) {
+    item.settled = true
+  }
   toasts = []
 }
-
-let activeUndoAction = null
 
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z') && !e.shiftKey) {
       const activeEl = document.activeElement
-      const isInput = activeEl && (
-        activeEl.tagName === 'INPUT' ||
-        activeEl.tagName === 'TEXTAREA' ||
-        activeEl.isContentEditable
-      )
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.isContentEditable)
       if (isInput) return
 
-      if (activeUndoAction) {
+      const latestUndo = [...toasts]
+        .reverse()
+        .find((t) => t.type === 'undo' && typeof t.onUndo === 'function' && !t.settled)
+      if (latestUndo) {
         e.preventDefault()
-        triggerUndo(activeUndoAction.id)
+        triggerUndo(latestUndo.id)
       }
     }
   })
 }
 
 export function triggerUndo(id) {
-  if (activeUndoAction && activeUndoAction.id === id) {
-    const { onUndo } = activeUndoAction
-    dismissToast(id)
-    activeUndoAction = null
+  const target = toasts.find((t) => t.id === id)
+  if (target && typeof target.onUndo === 'function' && !target.settled) {
+    target.settled = true
+    const undoCb = target.onUndo
+    target.onUndo = undefined
+    target.onConfirm = undefined
+    dismissToast(id, { runConfirm: false })
     try {
-      onUndo?.()
+      undoCb()
     } catch (err) {
       console.error('Undo action failed:', err)
     }
@@ -85,21 +115,26 @@ export function addToast({
   dismissible = true,
   onUndo = undefined,
   onConfirm = undefined,
+  replaceDuplicate = false,
 } = {}) {
   const cleanMessage = String(message ?? '').trim()
   if (!cleanMessage) return null
 
   const resolvedType = ['success', 'error', 'warning', 'info', 'undo'].includes(type) ? type : 'info'
-
-  // Prevent duplicate identical toasts triggered within 1500ms
   const now = Date.now()
-  if (cleanMessage === lastToastMessage && resolvedType === lastToastType && (now - lastToastTime) < 1500) {
-    return null
-  }
 
-  // Prevent duplicate if an identical toast is already active on screen
-  if (toasts.some(t => t.message === cleanMessage && t.type === resolvedType)) {
-    return null
+  if (replaceDuplicate) {
+    const existing = toasts.filter((t) => t.message === cleanMessage && t.type === resolvedType)
+    for (const dup of existing) {
+      dismissToast(dup.id, { runConfirm: false })
+    }
+  } else {
+    if (cleanMessage === lastToastMessage && resolvedType === lastToastType && now - lastToastTime < 1500) {
+      return null
+    }
+    if (toasts.some((t) => t.message === cleanMessage && t.type === resolvedType)) {
+      return null
+    }
   }
 
   lastToastMessage = cleanMessage
@@ -116,27 +151,22 @@ export function addToast({
     duration,
     onUndo,
     onConfirm,
+    settled: false,
   }
 
-  if (type === 'undo' && onUndo) {
-    activeUndoAction = { id, onUndo, onConfirm }
+  const combined = [...toasts, newToast]
+  if (combined.length > 5) {
+    const evicted = combined.slice(0, combined.length - 5)
+    for (const oldItem of evicted) {
+      clearTimerFor(oldItem.id)
+      settlePendingConfirm(oldItem)
+    }
   }
-
-  // Prepend or append? Append so new toasts stack below, or max 5 toasts visible
-  toasts = [...toasts, newToast].slice(-5)
+  toasts = combined.slice(-5)
 
   if (duration > 0) {
     const timer = setTimeout(() => {
-      if (activeUndoAction?.id === id) {
-        const { onConfirm: confirmCb } = activeUndoAction
-        activeUndoAction = null
-        try {
-          confirmCb?.()
-        } catch (err) {
-          console.error('Confirm action failed:', err)
-        }
-      }
-      dismissToast(id)
+      dismissToast(id, { runConfirm: true })
     }, duration)
     timers.set(id, timer)
   }
@@ -169,7 +199,7 @@ export const toast = {
     })
   },
   dismiss(id) {
-    dismissToast(id)
+    dismissToast(id, { runConfirm: true })
   },
   clear() {
     clearToasts()

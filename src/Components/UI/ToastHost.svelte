@@ -7,7 +7,8 @@
 </script>
 
 <script>
-  import { usePage } from '@inertiajs/svelte'
+  import { onMount } from 'svelte'
+  import { router, usePage } from '@inertiajs/svelte'
   import { getToastsState, dismissToast, toast, triggerUndo } from '../../lib/toast.svelte.js'
   import Toast from './Toast.svelte'
   import { cn } from '../../lib/utils.js'
@@ -19,31 +20,61 @@
 
   const page = usePage()
   const toasts = $derived(getToastsState())
+  let visitTick = $state(0)
+
+  onMount(() => {
+    const offStart = router.on('start', () => {
+      lastFlashSuccess = null
+      lastFlashError = null
+      lastFlashWarning = null
+      lastFlashInfo = null
+    })
+    const offFinish = router.on('finish', () => {
+      visitTick++
+    })
+
+    return () => {
+      offStart()
+      offFinish()
+    }
+  })
 
   $effect(() => {
+    void visitTick
     const flash = page?.props?.flash
-    const successMsg = flash?.success || page?.props?.success
+    const successMsg = flash?.success || page?.props?.success || null
     const errors = page?.props?.errors
     const firstError = errors && typeof errors === 'object' ? Object.values(errors)[0] : null
     const errorMsg = flash?.error || page?.props?.error || (typeof firstError === 'string' ? firstError : null)
-    const warningMsg = flash?.warning
-    const infoMsg = flash?.info
+    const warningMsg = flash?.warning || null
+    const infoMsg = flash?.info || null
 
-    if (successMsg && successMsg !== lastFlashSuccess) {
+    if (!successMsg) {
+      lastFlashSuccess = null
+    } else if (successMsg !== lastFlashSuccess) {
       lastFlashSuccess = successMsg
-      toast.success(successMsg)
+      toast.success(successMsg, { replaceDuplicate: true })
     }
-    if (errorMsg && errorMsg !== lastFlashError) {
+
+    if (!errorMsg) {
+      lastFlashError = null
+    } else if (errorMsg !== lastFlashError) {
       lastFlashError = errorMsg
-      toast.error(errorMsg)
+      toast.error(errorMsg, { replaceDuplicate: true })
     }
-    if (warningMsg && warningMsg !== lastFlashWarning) {
+
+    if (!warningMsg) {
+      lastFlashWarning = null
+    } else if (warningMsg !== lastFlashWarning) {
       lastFlashWarning = warningMsg
-      toast.warning(warningMsg)
+      toast.warning(warningMsg, { replaceDuplicate: true })
     }
-    if (infoMsg && infoMsg !== lastFlashInfo) {
+
+    if (!infoMsg) {
+      lastFlashInfo = null
+    } else if (infoMsg !== lastFlashInfo) {
       lastFlashInfo = infoMsg
-      toast.info(infoMsg)
+      toast.info(infoMsg, { replaceDuplicate: true })
     }
   })
 
@@ -74,7 +105,7 @@
           duration={item.duration}
           dismissible={item.dismissible}
           onundo={() => triggerUndo(item.id)}
-          onclose={() => dismissToast(item.id)}
+          onclose={() => dismissToast(item.id, { runConfirm: true })}
         />
       </div>
     {/each}

@@ -9,7 +9,8 @@
   bind:open={state.open}
   title={state.options.title ?? 'تأیید عملیات'}
   message={state.options.message ?? ''}
-  confirmLabel={state.options.confirmLabel ?? 'تأیید'}
+  confirmLabel={state.options.confirmLabel ?? state.options.confirmText ?? 'تأیید'}
+  cancelLabel={state.options.cancelLabel ?? state.options.cancelText ?? 'انصراف'}
   variant={state.options.variant ?? state.options.type ?? 'danger'}
   onconfirm={() => settleConfirm(true)}
   oncancel={() => settleConfirm(false)}
