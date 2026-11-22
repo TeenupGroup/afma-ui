@@ -1,0 +1,25 @@
+{
+  "name": "@teenup/afma-ui",
+  "version": "1.0.0",
+  "description": "Shared Svelte 5 + Tailwind CSS v4 UI & Admin Component Library for AFMA Ecosystem",
+  "type": "module",
+  "main": "./src/index.js",
+  "svelte": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./components": "./src/Components/UI/index.js",
+    "./admin": "./src/Admin/index.js",
+    "./layouts/AdminShell.svelte": "./src/Layouts/AdminShell.svelte",
+    "./rich-editor": "./src/Components/UI/RichEditor.svelte",
+    "./lib/*": "./src/lib/*",
+    "./utils/*": "./src/utils/*",
+    "./styles/afma-ui.css": "./src/styles/afma-ui.css"
+  },
+  "peerDependencies": {
+    "@inertiajs/svelte": "^3.0.0",
+    "clsx": "^2.0.0",
+    "lucide-svelte": "^1.0.0",
+    "svelte": "^5.0.0",
+    "tailwind-merge": "^2.0.0 || ^3.0.0"
+  }
+}
