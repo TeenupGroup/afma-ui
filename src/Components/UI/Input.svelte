@@ -14,6 +14,7 @@
     disabled = false,
     readonly = false,
     numeric = false,
+    persian = true,
     size = 'md', // 'sm' | 'md' | 'lg'
     startIcon = undefined,
     endIcon = undefined,
@@ -33,8 +34,16 @@
     lg: 'px-4 py-2.5 text-sm sm:text-base rounded-2xl',
   }
 
+  const shouldConvertPersian = $derived(
+    (persian || numeric) &&
+    rest.dir !== 'ltr' &&
+    !['password', 'email', 'url', 'file', 'number', 'date', 'time'].includes(type) &&
+    !inputClass.includes('no-persian-nums') &&
+    !className.includes('no-persian-nums')
+  )
+
   function handleInput(e) {
-    if (numeric) {
+    if (shouldConvertPersian) {
       persianInputHandler(e)
     }
     value = e.target.value

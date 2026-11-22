@@ -135,7 +135,7 @@ export function persianDigits(node) {
     const el = e?.target
     if (!el || typeof el.value !== 'string') return
     if (el.tagName === 'SELECT') return
-    if (el.type === 'file' || el.type === 'password' || el.type === 'email' || el.type === 'url') return
+    if (el.type === 'file' || el.type === 'password' || el.type === 'email' || el.type === 'url' || el.type === 'number' || el.type === 'date' || el.type === 'time') return
     if (typeof el.closest === 'function') {
       if (el.closest('.no-persian-nums') || el.classList?.contains('no-persian-nums')) return
       if (el.closest('[dir="ltr"]') || el.getAttribute?.('dir') === 'ltr') return

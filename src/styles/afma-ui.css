@@ -103,6 +103,15 @@
     font-display: swap;
 }
 
+body,
+input:not([dir="ltr"]),
+textarea:not([dir="ltr"]),
+select:not([dir="ltr"]) {
+    font-feature-settings: "ss02";
+    -moz-font-feature-settings: "ss02";
+    -webkit-font-feature-settings: "ss02";
+}
+
 .persian-numbers {
     font-feature-settings: "ss02";
     -moz-font-feature-settings: "ss02";
@@ -110,7 +119,7 @@
 }
 
 .tabular-nums {
-    font-feature-settings: 'tnum' 1;
+    font-feature-settings: 'tnum' 1, 'ss02' 1;
     font-variant-numeric: tabular-nums;
 }
 
