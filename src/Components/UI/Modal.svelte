@@ -3,6 +3,7 @@
 </script>
 
 <script>
+  import { tick } from 'svelte'
   import { X } from 'lucide-svelte'
 
   let {
@@ -15,6 +16,7 @@
     position = 'left', // 'left' | 'right'
     closeOnBackdrop = true,
     closeOnEscape = true,
+    ariaLabel = '',
     onclose = undefined,
     onClose = undefined,
     header = undefined,
@@ -26,9 +28,13 @@
 
   const modalId = `modal-${Math.random().toString(36).slice(2, 9)}`
   const modalTitleId = `${modalId}-title`
+  const modalDescId = `${modalId}-desc`
+
+  let dialogEl = $state(null)
 
   const isModalOpen = $derived(isOpen !== undefined ? Boolean(isOpen) : Boolean(open))
   const isDrawer = $derived(variant === 'drawer')
+  const hasVisibleTitleHeading = $derived(Boolean(title) && !header)
 
   const dialogSizes = {
     sm: 'max-w-md',
@@ -50,6 +56,25 @@
     full: 'max-w-full sm:max-w-[95vw]',
   }
 
+  const FOCUSABLE_SELECTOR = [
+    'a[href]',
+    'button:not(:disabled)',
+    'input:not(:disabled):not([type="hidden"])',
+    'select:not(:disabled)',
+    'textarea:not(:disabled)',
+    '[tabindex]:not([tabindex="-1"])',
+  ].join(', ')
+
+  function getFocusableElements(container) {
+    if (!container) return []
+    return Array.from(container.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
+      (el) =>
+        !el.hasAttribute('disabled') &&
+        el.getAttribute('aria-hidden') !== 'true' &&
+        (el.offsetParent !== null || el === document.activeElement)
+    )
+  }
+
   function handleClose() {
     open = false
     onclose?.()
@@ -63,27 +88,72 @@
   }
 
   function handleKeydown(e) {
-    if (
-      closeOnEscape &&
-      e.key === 'Escape' &&
-      isModalOpen &&
-      openModalStack[openModalStack.length - 1] === modalId
-    ) {
+    if (!isModalOpen || openModalStack[openModalStack.length - 1] !== modalId) {
+      return
+    }
+
+    if (closeOnEscape && e.key === 'Escape') {
+      e.preventDefault()
       e.stopImmediatePropagation?.()
       handleClose()
+      return
+    }
+
+    if (e.key === 'Tab' && dialogEl) {
+      const focusables = getFocusableElements(dialogEl)
+      if (focusables.length === 0) {
+        e.preventDefault()
+        dialogEl.focus()
+        return
+      }
+
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      const active = document.activeElement
+
+      if (e.shiftKey) {
+        if (active === first || !dialogEl.contains(active)) {
+          e.preventDefault()
+          last.focus()
+        }
+      } else if (active === last || !dialogEl.contains(active)) {
+        e.preventDefault()
+        first.focus()
+      }
     }
   }
 
   $effect(() => {
     if (isModalOpen) {
+      const previouslyFocused =
+        typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null
+
       openModalStack.push(modalId)
       const originalOverflow = document.body.style.overflow
       document.body.style.overflow = 'hidden'
+
+      tick().then(() => {
+        if (!dialogEl) return
+        const autoTarget = dialogEl.querySelector('[autofocus]')
+        if (autoTarget instanceof HTMLElement) {
+          autoTarget.focus()
+        } else {
+          dialogEl.focus()
+        }
+      })
+
       return () => {
         const idx = openModalStack.lastIndexOf(modalId)
         if (idx !== -1) openModalStack.splice(idx, 1)
         if (openModalStack.length === 0) {
           document.body.style.overflow = originalOverflow
+        }
+        if (previouslyFocused && document.contains(previouslyFocused)) {
+          requestAnimationFrame(() => {
+            previouslyFocused.focus()
+          })
         }
       }
     }
@@ -98,17 +168,19 @@
     <div
       class="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs transition-opacity animate-fade-in"
       onclick={handleBackdropClick}
-      onkeydown={(e) => { if (e.key === 'Escape' && closeOnEscape && openModalStack[openModalStack.length - 1] === modalId) handleClose() }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={title ? modalTitleId : undefined}
-      tabindex="-1"
+      role="presentation"
     >
       <div
-        class="fixed inset-y-0 {position === 'left' ? 'left-0 border-r drawer-animate-left' : 'right-0 border-l drawer-animate-right'} z-50 h-full bg-white shadow-2xl border-slate-200/80 {drawerSizes[size] || drawerSizes.md} w-full flex flex-col overflow-hidden text-right {className}"
+        bind:this={dialogEl}
+        class="fixed inset-y-0 {position === 'left' ? 'left-0 border-r drawer-animate-left' : 'right-0 border-l drawer-animate-right'} z-50 h-full bg-white shadow-2xl border-slate-200/80 {drawerSizes[size] || drawerSizes.md} w-full flex flex-col overflow-hidden text-right outline-hidden {className}"
         dir="rtl"
         onclick={(e) => e.stopPropagation()}
-        role="document"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={hasVisibleTitleHeading ? modalTitleId : undefined}
+        aria-label={!hasVisibleTitleHeading ? (ariaLabel || title || 'پنجره گفتگو') : undefined}
+        aria-describedby={description && !header ? modalDescId : undefined}
+        tabindex="-1"
         {...rest}
       >
         <!-- Header -->
@@ -122,7 +194,7 @@
                   <h2 id={modalTitleId} class="text-base sm:text-lg font-black text-slate-800">{title}</h2>
                 {/if}
                 {#if description}
-                  <p class="text-xs text-slate-400 mt-0.5">{description}</p>
+                  <p id={modalDescId} class="text-xs text-slate-400 mt-0.5">{description}</p>
                 {/if}
               {/if}
             </div>
@@ -168,17 +240,19 @@
     <div
       class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-fade-in"
       onclick={handleBackdropClick}
-      onkeydown={(e) => { if (e.key === 'Escape' && closeOnEscape && openModalStack[openModalStack.length - 1] === modalId) handleClose() }}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby={title ? modalTitleId : undefined}
-      tabindex="-1"
+      role="presentation"
     >
       <div
-        class="bg-white rounded-3xl shadow-2xl border border-slate-200/80 {dialogSizes[size] || dialogSizes.md} w-full max-h-[92vh] flex flex-col overflow-hidden text-right {className}"
+        bind:this={dialogEl}
+        class="bg-white rounded-3xl shadow-2xl border border-slate-200/80 {dialogSizes[size] || dialogSizes.md} w-full max-h-[92vh] flex flex-col overflow-hidden text-right outline-hidden {className}"
         dir="rtl"
         onclick={(e) => e.stopPropagation()}
-        role="document"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={hasVisibleTitleHeading ? modalTitleId : undefined}
+        aria-label={!hasVisibleTitleHeading ? (ariaLabel || title || 'پنجره گفتگو') : undefined}
+        aria-describedby={description && !header ? modalDescId : undefined}
+        tabindex="-1"
         {...rest}
       >
         <!-- Header -->
@@ -192,7 +266,7 @@
                   <h2 id={modalTitleId} class="text-base sm:text-lg font-black text-slate-800">{title}</h2>
                 {/if}
                 {#if description}
-                  <p class="text-xs text-slate-400 mt-0.5">{description}</p>
+                  <p id={modalDescId} class="text-xs text-slate-400 mt-0.5">{description}</p>
                 {/if}
               {/if}
             </div>
