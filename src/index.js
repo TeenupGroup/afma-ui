@@ -5,3 +5,5 @@ export { formatPersianNumber, formatPrice, formatDate, formatDuration, toFa, toF
 export * from './lib/toast.svelte.js'
 export * from './lib/confirm.svelte.js'
 export * from './lib/api.js'
+export * from './lib/theme.svelte.js'
+
