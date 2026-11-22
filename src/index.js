@@ -1,6 +1,7 @@
 export * from './Components/UI/index.js'
 export * from './Admin/index.js'
 export * from './lib/utils.js'
+export { formatPersianNumber, formatPrice, formatDate, formatDuration, toFa, toFaTime } from './lib/format.js'
 export * from './lib/toast.svelte.js'
 export * from './lib/confirm.svelte.js'
 export * from './lib/api.js'

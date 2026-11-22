@@ -83,3 +83,19 @@ export function formatDuration(seconds) {
   }
   return `${toFa(mins)}:${String(secs).padStart(2, '0')}`
 }
+
+/**
+ * Format a numeric value with Persian thousands separator (،) and Persian digits.
+ *
+ * @param {number|string|null|undefined} value
+ * @returns {string}
+ */
+export function formatPersianNumber(value) {
+  if (value === null || value === undefined || value === '') return toPersianDigits(0)
+  const num = Number(toEnglishDigits(value))
+  if (!Number.isFinite(num)) return toPersianDigits(value)
+  const formatted = Math.round(num)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, '،')
+  return toPersianDigits(formatted)
+}
