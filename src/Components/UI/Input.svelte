@@ -1,5 +1,5 @@
 <script>
-  import { persianInputHandler } from '../../lib/utils.js'
+  import { persianInputHandler, toEnglishDigits, toPersianDigits } from '../../lib/utils.js'
 
   let {
     value = $bindable(),
@@ -34,21 +34,79 @@
     lg: 'px-4 py-2.5 text-sm sm:text-base rounded-2xl',
   }
 
+  const isNumericType = $derived(type === 'number')
+
   const shouldConvertPersian = $derived(
-    (persian || numeric) &&
+    (persian || numeric || isNumericType) &&
     rest.dir !== 'ltr' &&
-    !['password', 'email', 'url', 'file', 'number', 'date', 'time'].includes(type) &&
+    !['password', 'email', 'url', 'file', 'date', 'time'].includes(type) &&
     !inputClass.includes('no-persian-nums') &&
     !className.includes('no-persian-nums')
   )
 
+  const resolvedType = $derived(isNumericType && shouldConvertPersian ? 'text' : type)
+  const resolvedInputMode = $derived(rest.inputmode || (isNumericType || numeric ? 'decimal' : undefined))
+
+  const displayValue = $derived(
+    shouldConvertPersian && value !== undefined && value !== null
+      ? toPersianDigits(String(value))
+      : (value ?? '')
+  )
+
+  const resolvedPlaceholder = $derived(
+    shouldConvertPersian && placeholder ? toPersianDigits(String(placeholder)) : placeholder
+  )
+
+  function syncValueFromDom(el) {
+    if (isNumericType && shouldConvertPersian) {
+      const eng = toEnglishDigits(el.value).replace(/\u066B/g, '.').trim()
+      if (eng === '') {
+        value = ''
+      } else if (eng === '-' || eng.endsWith('.') || /\.\d*0$/.test(eng)) {
+        value = eng
+      } else {
+        const parsed = Number(eng)
+        value = Number.isNaN(parsed) ? eng : parsed
+      }
+    } else {
+      value = el.value
+    }
+  }
+
   function handleInput(e) {
+    const el = e.target
+    if (shouldConvertPersian) {
+      if (isNumericType && typeof el.value === 'string' && el.value.includes('\u066B')) {
+        const start = el.selectionStart
+        el.value = el.value.replace(/\u066B/g, '.')
+        if (start !== null && typeof el.setSelectionRange === 'function') {
+          try {
+            el.setSelectionRange(start, start)
+          } catch {
+            // ignore selection errors
+          }
+        }
+      }
+      persianInputHandler(e)
+    }
+    syncValueFromDom(el)
+    oninput?.(e)
+    if (el.value !== displayValue) {
+      // Allow external oninput handlers that mutated el.value to reflect back
+      if (shouldConvertPersian) {
+        persianInputHandler(e)
+      }
+      syncValueFromDom(el)
+    }
+  }
+
+  function handleChange(e) {
+    const el = e.target
     if (shouldConvertPersian) {
       persianInputHandler(e)
     }
-    value = e.target.value
-    oninput?.(e)
-    value = e.target.value
+    syncValueFromDom(el)
+    onchange?.(e)
   }
 
   const isStartComponent = $derived(typeof startIcon === 'function' && Boolean(startIcon.prototype))
@@ -78,16 +136,17 @@
     {/if}
 
     <input
-      {type}
+      type={resolvedType}
+      inputmode={resolvedInputMode}
       {name}
       id={inputId}
-      bind:value
-      {placeholder}
+      value={displayValue}
+      placeholder={resolvedPlaceholder}
       {required}
       {disabled}
       {readonly}
       oninput={handleInput}
-      {onchange}
+      onchange={handleChange}
       {onkeydown}
       class="w-full bg-slate-50 border transition-all outline-hidden text-slate-800 placeholder:text-slate-400 {sizeStyles[size] || sizeStyles.md} {startIcon ? 'pr-9' : ''} {endIcon ? 'pl-9' : ''} {error ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20' : 'border-slate-200 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20'} {disabled ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''} {inputClass}"
       {...rest}

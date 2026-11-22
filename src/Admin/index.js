@@ -6,3 +6,4 @@ export { default as PersianTimePicker } from './components/PersianTimePicker.sve
 export { default as ValidationRuleBuilder } from './components/ValidationRuleBuilder.svelte'
 export { default as PermissionGate } from './components/PermissionGate.svelte'
 export { default as BookImageModal } from './components/BookImageModal.svelte'
+export { default as LetterTypographyControls } from './components/LetterTypographyControls.svelte'

@@ -1,5 +1,5 @@
 <script>
-  import { persianInputHandler } from '../../lib/utils.js'
+  import { persianInputHandler, toPersianDigits } from '../../lib/utils.js'
 
   let {
     value = $bindable(),
@@ -30,13 +30,34 @@
     !className.includes('no-persian-nums')
   )
 
+  const displayValue = $derived(
+    shouldConvertPersian && value !== undefined && value !== null
+      ? toPersianDigits(String(value))
+      : (value ?? '')
+  )
+
+  const resolvedPlaceholder = $derived(
+    shouldConvertPersian && placeholder ? toPersianDigits(String(placeholder)) : placeholder
+  )
+
   function handleInput(e) {
     if (shouldConvertPersian) {
       persianInputHandler(e)
     }
     value = e.target.value
     oninput?.(e)
+    if (shouldConvertPersian) {
+      persianInputHandler(e)
+    }
     value = e.target.value
+  }
+
+  function handleChange(e) {
+    if (shouldConvertPersian) {
+      persianInputHandler(e)
+    }
+    value = e.target.value
+    onchange?.(e)
   }
 </script>
 
@@ -53,14 +74,14 @@
   <textarea
     {name}
     id={textareaId}
-    bind:value
-    {placeholder}
+    value={displayValue}
+    placeholder={resolvedPlaceholder}
     {required}
     {disabled}
     {readonly}
     {rows}
     oninput={handleInput}
-    {onchange}
+    onchange={handleChange}
     {onkeydown}
     class="w-full bg-slate-50 border transition-all outline-hidden text-slate-800 placeholder:text-slate-400 px-3.5 py-2.5 text-xs sm:text-sm rounded-xl resize-y {error ? 'border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20' : 'border-slate-200 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20'} {disabled ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''} {textareaClass}"
     {...rest}
