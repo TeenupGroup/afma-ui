@@ -544,6 +544,21 @@ export function generateSlug(text) {
 }
 
 /**
+ * Escape HTML special characters to prevent XSS in `{@html ...}` blocks and attribute contexts.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/**
  * Convert inline Markdown syntax (images, links, bold, italic, strike, code)
  * into HTML while preserving existing HTML tags.
  *
