@@ -12,6 +12,7 @@
     brandSubtitle = 'سامانه یکپارچه',
     brandHref = '/dashboard',
     brandIcon: BrandIcon = Shield,
+    brandLogoUrl = '',
     brandGradient = 'from-blue-600 to-indigo-700',
     homeHref = '/',
     homeLabel = 'مشاهده سایت',
@@ -161,12 +162,20 @@
       collapsed ? 'lg:justify-center' : 'gap-3 justify-between'
     )}>
       <Link href={brandHref} onclick={onNavigate} class="flex items-center gap-3 min-w-0">
-        <div class={cn(
-          'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm bg-gradient-to-br text-white',
-          brandGradient
-        )}>
-          <BrandIcon class="w-5 h-5" />
-        </div>
+        {#if brandLogoUrl}
+          <img
+            src={brandLogoUrl}
+            alt={brandTitle}
+            class="w-10 h-10 rounded-xl object-contain bg-white border border-slate-200/80 p-1 shrink-0 shadow-xs"
+          />
+        {:else}
+          <div class={cn(
+            'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm bg-gradient-to-br text-white',
+            brandGradient
+          )}>
+            <BrandIcon class="w-5 h-5" />
+          </div>
+        {/if}
         {#if !collapsed}
           <div class="flex-1 min-w-0">
             <h2 class="text-sm font-black text-slate-800 truncate">{brandTitle}</h2>
