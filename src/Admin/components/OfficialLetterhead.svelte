@@ -12,6 +12,7 @@
     effectiveFontSize = $bindable(11),
     isAutoShrunk = $bindable(false),
     overflowsPage = $bindable(false),
+    estimatedPages = $bindable(1),
   } = $props()
 
   const page = usePage()
@@ -84,6 +85,12 @@
   })
 
   const fitToOnePage = $derived(Boolean(letter.metadata?.fit_to_one_page))
+  const paperSize = $derived((letter.metadata?.paper_size || 'a4').toLowerCase() === 'a5' ? 'a5' : 'a4')
+  const isA5 = $derived(paperSize === 'a5')
+  const sheetWidthMm = $derived(isA5 ? '148mm' : '210mm')
+  const sheetHeightMm = $derived(isA5 ? '210mm' : '297mm')
+  const fitHeightMm = $derived(isA5 ? '205mm' : '292mm')
+  const sheetPadding = $derived(isA5 ? '10mm 11mm' : '16mm 18mm')
   const validTranscripts = $derived(
     Array.isArray(letter.transcripts) ? letter.transcripts.filter((t) => t && String(t).trim()) : []
   )
@@ -91,7 +98,6 @@
   let docEl = $state(null)
   let fitRulerEl = $state(null)
   let fullPageRulerEl = $state(null)
-  let estimatedPages = $state(1)
 
   function lerp(minVal, maxVal, t) {
     return minVal + (maxVal - minVal) * t
@@ -100,29 +106,31 @@
   function applyTypographyAtFactor(t, startFont, startLineHeight) {
     if (!docEl) return startFont
 
+    const a5Mult = isA5 ? 0.88 : 1
+    const adjustedStartFont = Math.max(5.5, startFont * a5Mult)
     let fontPt
     let lineH
     if (t >= 0.3) {
       const localT = (t - 0.3) / 0.7
-      const midFont = Math.min(6, startFont)
-      fontPt = lerp(midFont, startFont, localT)
+      const midFont = Math.min(6, adjustedStartFont)
+      fontPt = lerp(midFont, adjustedStartFont, localT)
       lineH = lerp(Math.min(1.36, startLineHeight), startLineHeight, localT)
     } else {
       const localT = t / 0.3
-      const midFont = Math.min(6, startFont)
+      const midFont = Math.min(6, adjustedStartFont)
       fontPt = lerp(3.5, midFont, localT)
       lineH = lerp(1.2, Math.min(1.36, startLineHeight), localT)
     }
 
-    const paraGap = lerp(2, 11, t)
-    const bodyPy = lerp(6, 20, t)
-    const recipientMb = lerp(4, 16, t)
-    const closingMt = lerp(4, 20, t)
-    const signerMt = lerp(6, 28, t)
-    const sigBoxH = lerp(38, 68, t)
-    const transcriptsMt = lerp(5, 22, t)
-    const footerMt = lerp(5, 16, t)
-    const subScale = lerp(0.76, 1, t)
+    const paraGap = lerp(2, 11 * a5Mult, t)
+    const bodyPy = lerp(5, 20 * a5Mult, t)
+    const recipientMb = lerp(4, 16 * a5Mult, t)
+    const closingMt = lerp(4, 20 * a5Mult, t)
+    const signerMt = lerp(5, 28 * a5Mult, t)
+    const sigBoxH = lerp(34, 68 * a5Mult, t)
+    const transcriptsMt = lerp(4, 22 * a5Mult, t)
+    const footerMt = lerp(4, 16 * a5Mult, t)
+    const subScale = lerp(0.76 * a5Mult, a5Mult, t)
 
     docEl.style.setProperty('--letter-font-size', `${fontPt.toFixed(2)}pt`)
     docEl.style.setProperty('--letter-line-height', `${lineH.toFixed(2)}`)
@@ -144,8 +152,8 @@
 
     const startFont = baseFontSize
     const startLH = baseLineHeight
-    const maxSinglePagePx = fitRulerEl.offsetHeight || 1103
-    const fullPagePx = fullPageRulerEl.offsetHeight || 1122
+    const maxSinglePagePx = fitRulerEl.offsetHeight || (isA5 ? 775 : 1103)
+    const fullPagePx = fullPageRulerEl.offsetHeight || (isA5 ? 794 : 1122)
 
     docEl.style.minHeight = '0px'
     docEl.style.height = 'auto'
@@ -160,7 +168,7 @@
       isAutoShrunk = false
       effectiveFontSize = Math.round(startFont * 10) / 10
       estimatedPages = doesOverflow ? Math.max(2, Math.ceil(naturalHeightAtBase / fullPagePx)) : 1
-      docEl.style.minHeight = '297mm'
+      docEl.style.minHeight = sheetHeightMm
       return
     }
 
@@ -169,9 +177,9 @@
       isAutoShrunk = false
       effectiveFontSize = Math.round(startFont * 10) / 10
       estimatedPages = 1
-      docEl.style.minHeight = '297mm'
-      docEl.style.height = '297mm'
-      docEl.style.maxHeight = '297mm'
+      docEl.style.minHeight = sheetHeightMm
+      docEl.style.height = sheetHeightMm
+      docEl.style.maxHeight = sheetHeightMm
       return
     }
 
@@ -194,9 +202,9 @@
     isAutoShrunk = true
     effectiveFontSize = Math.round(chosenFont * 10) / 10
     estimatedPages = 1
-    docEl.style.minHeight = '297mm'
-    docEl.style.height = '297mm'
-    docEl.style.maxHeight = '297mm'
+    docEl.style.minHeight = sheetHeightMm
+    docEl.style.height = sheetHeightMm
+    docEl.style.maxHeight = sheetHeightMm
   }
 
   $effect(() => {
@@ -220,6 +228,7 @@
     void baseFontSize
     void baseLineHeight
     void fitToOnePage
+    void paperSize
 
     recalculateLayout()
   })
@@ -237,30 +246,30 @@
 <div
   bind:this={docEl}
   {id}
-  class="letter-a4-sheet {fitToOnePage ? 'is-fit-mode' : ''} bg-white text-slate-800 shadow-xl rounded-lg mx-auto relative flex flex-col justify-between overflow-hidden transition-transform duration-200 border border-slate-200"
-  style="width: 210mm; min-height: 297mm; padding: 16mm 18mm; transform-origin: top center; transform: scale({scale}); font-family: var(--font-sans, 'YekanBakh', system-ui, sans-serif);"
+  class="letter-a4-sheet {fitToOnePage ? 'is-fit-mode' : ''} {isA5 ? 'is-a5' : ''} bg-white text-slate-800 shadow-xl rounded-lg mx-auto relative flex flex-col justify-between overflow-hidden transition-transform duration-200 border border-slate-200"
+  style="width: {sheetWidthMm}; min-height: {sheetHeightMm}; padding: {sheetPadding}; transform-origin: top center; transform: scale({scale}); font-family: var(--font-sans, 'YekanBakh', system-ui, sans-serif);"
   dir="rtl"
 >
-  <!-- Hidden physical mm rulers for zoom/DPI-independent A4 measurement -->
+  <!-- Hidden physical mm rulers for zoom/DPI-independent A4/A5 measurement -->
   <div
     bind:this={fitRulerEl}
     aria-hidden="true"
-    style="position: absolute; top: 0; left: 0; width: 0; height: 292mm; visibility: hidden; pointer-events: none;"
+    style="position: absolute; top: 0; left: 0; width: 0; height: {fitHeightMm}; visibility: hidden; pointer-events: none;"
   ></div>
   <div
     bind:this={fullPageRulerEl}
     aria-hidden="true"
-    style="position: absolute; top: 0; left: 0; width: 0; height: 297mm; visibility: hidden; pointer-events: none;"
+    style="position: absolute; top: 0; left: 0; width: 0; height: {sheetHeightMm}; visibility: hidden; pointer-events: none;"
   ></div>
 
   {#if overflowsPage && !fitToOnePage}
     <div
       aria-hidden="true"
       class="pointer-events-none absolute left-0 right-0 border-t-2 border-dashed border-amber-500/80 z-20 flex justify-center"
-      style="top: 297mm;"
+      style="top: {sheetHeightMm};"
     >
       <span class="bg-amber-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full -mt-2.5 shadow-xs">
-        مرز پایان صفحه اول A4 (ادامه در صفحه دوم)
+        مرز پایان صفحه اول {paperSize.toUpperCase()} (ادامه با سربرگ و فوتر ثابت)
       </span>
     </div>
   {/if}
@@ -272,13 +281,13 @@
     <!-- Right: Vector Logo & Organization Info -->
     <div class="flex items-center gap-3 w-[40%]">
       {#if logoSrc}
-        <img src={logoSrc} alt={displayHeaderTitle} onload={recalculateLayout} onerror={(e) => { e.currentTarget.style.display = 'none' }} class="w-16 h-16 object-contain shrink-0" />
+        <img src={logoSrc} alt={displayHeaderTitle} onload={recalculateLayout} onerror={(e) => { e.currentTarget.style.display = 'none' }} class="{isA5 ? 'w-11 h-11' : 'w-16 h-16'} object-contain shrink-0" />
       {/if}
       <div class="flex flex-col text-right">
-        <h2 class="text-base font-extrabold leading-tight" style="color: {primaryDark}">
+        <h2 class="{isA5 ? 'text-sm' : 'text-base'} font-extrabold leading-tight" style="color: {primaryDark}">
           {displayHeaderTitle}
         </h2>
-        <span class="text-xs font-semibold text-slate-700 mt-0.5">
+        <span class="{isA5 ? 'text-[10px]' : 'text-xs'} font-semibold text-slate-700 mt-0.5">
           {displaySchoolName}
         </span>
       </div>
@@ -286,13 +295,13 @@
 
     <!-- Center: Bismillah -->
     <div class="text-center w-[20%] pt-2.5">
-      <div class="text-sm font-extrabold text-slate-900 tracking-wide">
+      <div class="{isA5 ? 'text-xs' : 'text-sm'} font-extrabold text-slate-900 tracking-wide">
         «بسمه تعالی»
       </div>
     </div>
 
-    <!-- Left: Metadata (Letter number, Date, Attachment) -->
-    <div class="w-[40%] flex flex-col items-end gap-1 text-xs">
+    <!-- Left: Metadata (Letter number, Date, Attachment, Page number in header) -->
+    <div class="w-[40%] flex flex-col items-end gap-1 {isA5 ? 'text-[10px]' : 'text-xs'}">
       <div class="flex items-center gap-1.5">
         <span class="text-slate-500 font-medium">شماره:</span>
         <span class="font-bold text-slate-900">{toPersianDigits(letter.letter_number || '---')}</span>
@@ -304,6 +313,9 @@
       <div class="flex items-center gap-1.5">
         <span class="text-slate-500 font-medium">پیوست:</span>
         <span class="font-semibold text-slate-800">{attachmentLabel}</span>
+      </div>
+      <div class="inline-flex items-center px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-700">
+        صفحه {toPersianDigits(1)} از {toPersianDigits(estimatedPages)}
       </div>
 
       {#if letter.priority && letter.priority !== 'normal'}
@@ -425,10 +437,6 @@
         {letter.footer_note}
       </div>
     {/if}
-
-    <div class="text-left text-[10px] text-slate-400 mt-1">
-      صفحه {toPersianDigits(1)} از {toPersianDigits(estimatedPages)}
-    </div>
   </footer>
 </div>
 

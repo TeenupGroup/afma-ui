@@ -1,7 +1,55 @@
 /**
  * Generate PDF from HTML string using html2pdf.js
- * Uses iframe for reliable rendering (lazy loads html2pdf on demand)
+ * Injects local Persian @font-face declarations and awaits iframe font readiness.
  */
+function buildPersianFontFaceCss() {
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `
+    @font-face {
+      font-family: 'YekanBakh';
+      src: url('${origin}/fonts/YekanBakh-Regular.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'YekanBakh';
+      src: url('${origin}/fonts/YekanBakh-SemiBold.woff2') format('woff2');
+      font-weight: 600;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'YekanBakh';
+      src: url('${origin}/fonts/YekanBakh-Bold.woff2') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Vazir';
+      src: url('${origin}/fonts/vazir/400.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Vazir';
+      src: url('${origin}/fonts/vazir/700.woff2') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url('${origin}/fonts/vazir/400.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Vazirmatn';
+      src: url('${origin}/fonts/vazir/700.woff2') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+    }
+  `
+}
+
 export async function generatePdf(html, options = {}) {
   const html2pdf = (await import('html2pdf.js')).default
   const {
@@ -13,10 +61,11 @@ export async function generatePdf(html, options = {}) {
     preview = false,
   } = options
 
-  const isLandscape = orientation === 'landscape'
-  const renderWidth = isLandscape ? 1160 : 840
+  const normalizedFormat = String(format || 'a4').toLowerCase() === 'a5' ? 'a5' : 'a4'
+  const normalizedOrientation = orientation === 'portrait' ? 'portrait' : 'landscape'
+  const isLandscape = normalizedOrientation === 'landscape'
+  const renderWidth = normalizedFormat === 'a5' ? (isLandscape ? 840 : 595) : (isLandscape ? 1160 : 840)
 
-  // Create a visible overlay with iframe for rendering
   const overlay = document.createElement('div')
   overlay.style.cssText = `
     position: fixed;
@@ -43,7 +92,7 @@ export async function generatePdf(html, options = {}) {
   overlay.appendChild(iframe)
   document.body.appendChild(overlay)
 
-  // Write HTML to iframe
+  const fontCss = buildPersianFontFaceCss()
   const iframeDoc = iframe.contentDocument || iframe.contentWindow.document
   iframeDoc.open()
   if (html.includes('<!DOCTYPE') || html.includes('<html')) {
@@ -55,8 +104,10 @@ export async function generatePdf(html, options = {}) {
       <head>
         <meta charset="UTF-8">
         <style>
-          * { font-family: 'YekanBakh', 'Tahoma', 'DejaVu Sans', sans-serif; }
-          body { margin: 0; padding: 15px; direction: rtl; }
+          ${fontCss}
+          * { font-family: 'YekanBakh', 'Vazir', 'Vazirmatn', sans-serif; box-sizing: border-box; }
+          body { margin: 0; padding: 12px; direction: rtl; color: #0f172a; }
+          @page { size: ${normalizedFormat.toUpperCase()} ${normalizedOrientation}; margin: 0; }
           @media print { body { padding: 0; } }
         </style>
       </head>
@@ -66,19 +117,30 @@ export async function generatePdf(html, options = {}) {
   }
   iframeDoc.close()
 
-  // Wait for iframe to load
-  await new Promise(resolve => {
+  if (iframeDoc.head && !iframeDoc.getElementById('afma-persian-pdf-fonts')) {
+    const styleNode = iframeDoc.createElement('style')
+    styleNode.id = 'afma-persian-pdf-fonts'
+    styleNode.textContent = `${fontCss}\n* { font-family: 'YekanBakh', 'Vazir', 'Vazirmatn', sans-serif; }`
+    iframeDoc.head.appendChild(styleNode)
+  }
+
+  await new Promise((resolve) => {
     iframe.onload = resolve
-    // Fallback if onload doesn't fire
-    setTimeout(resolve, 800)
+    setTimeout(resolve, 600)
   })
 
-  // Small delay for font loading and rendering
-  await new Promise(resolve => setTimeout(resolve, 500))
+  if (iframeDoc.fonts && iframeDoc.fonts.ready) {
+    try {
+      await iframeDoc.fonts.ready
+    } catch {
+      // Ignore font observer failure and continue with timeout fallback
+    }
+  }
+  await new Promise((resolve) => setTimeout(resolve, 250))
 
   const config = {
-    margin: margin,
-    filename: filename,
+    margin,
+    filename,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: {
       scale: 2,
@@ -89,12 +151,12 @@ export async function generatePdf(html, options = {}) {
     },
     jsPDF: {
       unit: 'mm',
-      format: format,
-      orientation: orientation,
+      format: normalizedFormat,
+      orientation: normalizedOrientation,
     },
     pagebreak: {
-      mode: ['avoid-all', 'css', 'legacy']
-    }
+      mode: ['avoid-all', 'css', 'legacy'],
+    },
   }
 
   try {

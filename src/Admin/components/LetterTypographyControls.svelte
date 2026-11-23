@@ -7,6 +7,8 @@
     fontSize = $bindable(11),
     lineHeight = $bindable(1.95),
     fitToOnePage = $bindable(false),
+    paperSize = $bindable('a4'),
+    estimatedPages = 1,
     effectiveFontSize = 11,
     isAutoShrunk = false,
     overflowsPage = false,
@@ -20,7 +22,10 @@
   ]
 
   const isModified = $derived(
-    Number(fontSize) !== 11 || Number(lineHeight) !== 1.95 || Boolean(fitToOnePage)
+    Number(fontSize) !== 11 ||
+      Number(lineHeight) !== 1.95 ||
+      Boolean(fitToOnePage) ||
+      String(paperSize || 'a4').toLowerCase() !== 'a4'
   )
 
   function stepFont(delta) {
@@ -32,19 +37,39 @@
     fontSize = 11
     lineHeight = 1.95
     fitToOnePage = false
+    paperSize = 'a4'
   }
 </script>
 
 <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5 space-y-3" dir="rtl">
-  <!-- Top row: Auto-fit toggle & live page-fit status -->
+  <!-- Top row: Paper size selector, Auto-fit toggle & live page-fit status -->
   <div class="flex flex-wrap items-center justify-between gap-2.5">
-    <Switch
-      bind:checked={fitToOnePage}
-      color="indigo"
-      size="sm"
-      label="جا دادن خودکار در یک صفحه"
-      description="در صورت سرریز متن، اندازه قلم و فاصله خطوط به‌صورت هوشمند متناسب با فضای یک برگ تنظیم می‌شود"
-    />
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5 shrink-0" role="group" aria-label="اندازه کاغذ چاپ">
+        <button
+          type="button"
+          onclick={() => (paperSize = 'a4')}
+          class="px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer {String(paperSize || 'a4').toLowerCase() !== 'a5' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'}"
+        >
+          کاغذ A4
+        </button>
+        <button
+          type="button"
+          onclick={() => (paperSize = 'a5')}
+          class="px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors cursor-pointer {String(paperSize || 'a4').toLowerCase() === 'a5' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'}"
+        >
+          کاغذ A5
+        </button>
+      </div>
+
+      <Switch
+        bind:checked={fitToOnePage}
+        color="indigo"
+        size="sm"
+        label="جا دادن خودکار در یک صفحه"
+        description="در صورت سرریز متن، اندازه قلم و فاصله خطوط به‌صورت هوشمند متناسب با فضای یک برگ تنظیم می‌شود"
+      />
+    </div>
 
     <div class="flex items-center gap-2 shrink-0">
       {#if fitToOnePage && isAutoShrunk}
@@ -53,7 +78,9 @@
         </Badge>
       {:else if overflowsPage && !fitToOnePage}
         <Badge color="amber" size="xs" icon={AlertTriangle}>
-          سرریز به صفحه دوم
+          {Number(estimatedPages) > 1
+            ? `${toPersianDigits(estimatedPages)} صفحه (سربرگ و فوتر ثابت)`
+            : 'سرریز به صفحه دوم'}
         </Badge>
         <button
           type="button"
@@ -65,7 +92,7 @@
         </button>
       {:else}
         <Badge color="emerald" size="xs" icon={CheckCircle2}>
-          در ۱ صفحه جا شده
+          در ۱ صفحه جا شده ({String(paperSize || 'a4').toUpperCase()})
         </Badge>
       {/if}
     </div>
