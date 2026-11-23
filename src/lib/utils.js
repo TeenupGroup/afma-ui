@@ -501,7 +501,7 @@ export function debounce(func, wait = 300) {
  * storageUrl('https://cdn.example.com/img.jpg') // 'https://cdn.example.com/img.jpg'
  * storageUrl(null) // null
  */
-const KNOWN_VAULT_SYSTEMS = ['masir', 'dideban', 'rah', 'rooyesh', 'hamafarin', 'daneshjoo', 'polevent', 'teenup']
+const KNOWN_VAULT_SYSTEMS = ['fmah', 'masir', 'dideban', 'rah', 'rooyesh', 'hamafarin', 'daneshjoo', 'polevent', 'teenup']
 
 export function storageUrl(path) {
   if (!path) return null
@@ -509,6 +509,7 @@ export function storageUrl(path) {
   if (!s) return null
   if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:') || s.startsWith('blob:')) return s
   if (s.startsWith('/')) return s
+  if (s.startsWith('vault/')) return `/${s}`
   const firstSegment = s.split('/')[0]
   if (KNOWN_VAULT_SYSTEMS.includes(firstSegment)) {
     return `/vault/${s}`
